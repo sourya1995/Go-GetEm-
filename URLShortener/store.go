@@ -1,14 +1,34 @@
 package main
 
-import "sync"
+import (
+	"sync"
+	"encoding/gob"
+	"io"
+	"log"
+	"os"
+)
 
 type URLStore struct {
 	urls map[string]string
 	mu sync.RWMutex
+	file *os.File
 }
 
-func NewURLStore() *URLStore{
-	return &URLStore{urls: make(map[string]string)}
+type record struct {
+	Key, URL string
+}
+
+func NewURLStore(filename string) *URLStore{
+	s := &URLStore{urls: make(map[string]string)}
+	f, err := os.OpenFile(filename, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0644)
+	if err != nil {
+		log.Fatal("Error opening URLStore:", err)
+	}
+	s.file = f 
+	if err := s.load(); err != nil {
+		log.Println("Error loading URLStore:", err)
+	}
+	return s
 }
 
 func (s *URLStore) Get(key string) string{
@@ -37,9 +57,36 @@ func (s *URLStore) Put(url string) string {
 	for {
 		key := genKey(s.Count()) //generate short URL
 		if ok := s.Set(key, url); ok{ //if we are able to set key, value for given URL, then return the key
+			if err := s.save(key, url); err != nil {
+				log.Println("Error saving to URLStore:", err)
+			}
 			return key
 		}
 	}
 
-	return " "
+	panic("Shouldn't get here")
 }
+
+func(s *URLStore) load() error {
+	if _, err := s.file.Seek(0, 0); err != nil {
+		return err
+	}
+	d := gob.NewDecoder(s.file)
+	var err error
+	for err == nil{
+		var r record
+		if err = d.Decoder(&r); err == nil {
+			s.Set(r.Key, r.URL)
+		}
+	}
+	if err == io.EOF {
+		return nil
+	}
+	return err
+
+}
+
+func(s *URLStore) save(key, url string) error {
+	e := gob.NewEncoder(s.file)
+	return e.Encode(record{key, url})
+} 
