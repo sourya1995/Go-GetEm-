@@ -33,10 +33,10 @@ func (s *URLStore) Count() int {
 	return len(s.urls)
 }
 
-func (s *URLStore) Put(url string) string {
+func (s *URLStore) Put(url string) string {  
 	for {
 		key := genKey(s.Count()) //generate short URL
-		if ok := s.Set(key, url); ok{
+		if ok := s.Set(key, url); ok{ //if we are able to set key, value for given URL, then return the key
 			return key
 		}
 	}
