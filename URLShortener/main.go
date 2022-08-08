@@ -13,9 +13,17 @@ URL: <input type="text" name="url">
 </html></body>
 `
 
-var store = NewURLStore()
+var (
+	listenAddr = flag.String("http", ":3000", "http listen address")
+	dataFile   = flag.String("file", "store.gob", "data store file name")
+	hostname   = flag.String("host","", "http host name")
+)
+
+var store *URLStore
 
 func main() {
+	flag.Parse()
+	store = NewURLStore(*dataFile)
 	http.HandleFunc("/", Redirect)
 	http.HandleFunc("/add", Add)
 	http.ListenAndServe(":3000", nil)

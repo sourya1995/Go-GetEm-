@@ -8,10 +8,12 @@ import (
 	"os"
 )
 
+const saveQueueLength = 1000
+
 type URLStore struct {
 	urls map[string]string
 	mu sync.RWMutex
-	file *os.File
+	save chan record
 }
 
 type record struct {
@@ -19,15 +21,14 @@ type record struct {
 }
 
 func NewURLStore(filename string) *URLStore{
-	s := &URLStore{urls: make(map[string]string)}
-	f, err := os.OpenFile(filename, os.O_RDWR | os.O_CREATE | os.O_APPEND, 0644)
-	if err != nil {
-		log.Fatal("Error opening URLStore:", err)
-	}
-	s.file = f 
-	if err := s.load(); err != nil {
+	s := &URLStore{urls: make(map[string]string),
+				   save: make(chan record, saveQueueLength),}
+	
+	
+	if err := s.load(filename); err != nil {
 		log.Println("Error loading URLStore:", err)
 	}
+	go s.saveLoop(filename)
 	return s
 }
 
@@ -57,9 +58,7 @@ func (s *URLStore) Put(url string) string {
 	for {
 		key := genKey(s.Count()) //generate short URL
 		if ok := s.Set(key, url); ok{ //if we are able to set key, value for given URL, then return the key
-			if err := s.save(key, url); err != nil {
-				log.Println("Error saving to URLStore:", err)
-			}
+			s.save <- record{key, url}
 			return key
 		}
 	}
@@ -68,9 +67,13 @@ func (s *URLStore) Put(url string) string {
 }
 
 func(s *URLStore) load() error {
-	if _, err := s.file.Seek(0, 0); err != nil {
+	f, err := os.Open(filename)
+	if err != nil {
+		log.Println("Error opening URLStore:", err)
 		return err
 	}
+	defer f.Close()
+	
 	d := gob.NewDecoder(s.file)
 	var err error
 	for err == nil{
@@ -82,11 +85,22 @@ func(s *URLStore) load() error {
 	if err == io.EOF {
 		return nil
 	}
+	log.Println("Error decoding URLStore:", err)
 	return err
 
 }
 
-func(s *URLStore) save(key, url string) error {
-	e := gob.NewEncoder(s.file)
-	return e.Encode(record{key, url})
+func (s *URLStore) saveLoop(filename string){
+	f, err := os.OpenFile(filename, os.O_WRONLY | os.O_CREATE | os.O_APPEND, 0644)
+	if err != nil {
+		log.Fatal("Error opening URLStore:", err)
+	}
+	defer f.Close()
+	e := gob.NewEncoder(f)
+	for {
+		r := <-s.save
+		if err := e.Encode(r); err != nil {
+			log.Println("Error saving to URLStore:", err)
+		}
+	}
 } 
