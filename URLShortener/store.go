@@ -74,7 +74,7 @@ func(s *URLStore) load() error {
 	}
 	defer f.Close()
 	
-	d := gob.NewDecoder(s.file)
+	d := json.NewDecoder(s.file)
 	var err error
 	for err == nil{
 		var r record
@@ -96,7 +96,7 @@ func (s *URLStore) saveLoop(filename string){
 		log.Fatal("Error opening URLStore:", err)
 	}
 	defer f.Close()
-	e := gob.NewEncoder(f)
+	e := json.NewEncoder(f)
 	for {
 		r := <-s.save
 		if err := e.Encode(r); err != nil {
