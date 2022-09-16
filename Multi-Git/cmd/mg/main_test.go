@@ -47,14 +47,21 @@ func TestCalcAreaViaTable(t *testing.T){
 	}
 
 	for _, test := range tests{
-		w := test.width
-		h := test.height
+		t.Run("", func(tt *testing.T){
+			tt.Parallel()
+			time.Sleep(time.Second)
+			w := test.width
+			h := test.height
+			r, err := CalcArea(w, h)
+			if err != nil {
+				t.Errorf("CalcArea(%d, %d) returned an error", w, h)
+			}else if r != test.expected {
+				t.Errorf("CalcArea(%d, %d) returned %d. Expected %d", w, h, r, test.expected)
+			}
 
-		r, err := CalcArea(w, h)
-		if err != nil {
-			t.Errorf("CalcArea(%d, %d) returned an error", w, h)
-		}else if r != test.expected {
-			t.Errorf("CalcArea(%d, %d) returned %d. Expected %d", w, h, r, test.expected)
-		}
+		})
+		
+
+		
 	}
 }
